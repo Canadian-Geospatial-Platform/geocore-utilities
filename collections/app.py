@@ -40,14 +40,16 @@ def lambda_handler(event, context):
         #parent
         parent_json, parent_id  = find_parent(geocore_df, uuid)
         
+        #child
+        child_json = None
+        child_count = 0
+        child_json, child_count = find_children(geocore_df, uuid)
+
         #sibling
         sibling_json = None
         sibling_count = 0
-        if parent_json != None:
+        if parent_json != None and child_json == None:
             sibling_json, sibling_count  = find_siblings(geocore_df, parent_id, uuid)
-            
-        #child
-        child_json, child_count = find_children(geocore_df, uuid)
         
     else:
         message += "No id parameter was passed. Usage: ?id=XYZ"
