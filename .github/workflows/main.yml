@@ -1,0 +1,41 @@
+name: Build deployment AWS Lambdas as ZIP
+on:
+  push:
+    paths:
+      - collections/**
+    branches:
+      - 'main' 
+      - 'master'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+          
+      - name: Set current date as env variable
+        run: echo "NOW=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
+          
+      - name: Echo intro message
+        run: echo "Building packages"
+        
+      - name: Build project
+        run: |
+          cd collections
+          echo "$NOW"
+          if [[ -f "requirements.txt" ]]; then
+            pip install --target . -r requirements.txt           
+            rm -rf botocore*
+            rm -rf boto3*
+            rm -rf **/tests
+            rm -rf **/__pycache__
+          fi
+          cd ..
+                   
+      - name: Upload zip file artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: collections-${{ env.NOW }}
+          path: ${{ github.workspace }}/*
