@@ -32,10 +32,10 @@ jobs:
             rm -rf **/tests
             rm -rf **/__pycache__
           fi
-          cd ..
+          cd ../..
                    
       - name: Upload zip file artifact
         uses: actions/upload-artifact@v3
         with:
           name: collections-${{ env.NOW }}
-          path: ${{ github.workspace }}/*
+          path: ${{ github.workspace }}/collections/*
