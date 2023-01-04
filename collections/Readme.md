@@ -102,12 +102,14 @@ Usage: collections?id=$SOME_UUID
 {
   "statusCode": 200,
   "sibling_count": 0,
+  "child_count": 0,
   "self": {
     "id": "2bcf34b5-4e9a-431b-9e43-1eace6c873bd",
     "description_en": "Inuit Communities Location",
-    "description_fr": "Localisation des communautés inuites" 
+    "description_fr": "Localisation des communautés inuites"
   },
   "parent": null,
-  "sibling": null
+  "sibling": null,
+  "child": null
 }
 </pre>
