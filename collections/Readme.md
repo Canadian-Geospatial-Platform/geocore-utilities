@@ -1,5 +1,7 @@
 # Collections API
 
+Identify collection parent, sibilings and children using AWS SDK for pandas (awswrangler)
+
 ## Test Cases
 
 Usage: collections?id=$SOME_UUID
