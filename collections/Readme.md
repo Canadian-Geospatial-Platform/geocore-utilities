@@ -35,28 +35,30 @@ Usage: collections?id=$SOME_UUID
 {
   "statusCode": 200,
   "sibling_count": 2,
+  "child_count": 0,
   "self": {
     "id": "9cad712a-5ac5-4248-b7d7-2db1a3892509",
     "description_en": "Active Floods in Canada",
-    "description_fr": "Inondations en cours au Canada" 
+    "description_fr": "Inondations en cours au Canada"
   },
   "parent": {
     "id": "08b810c2-7c81-40f1-adb1-c32c8a2c9f50",
     "description_en": "Floods in Canada - Cartographic Product Collection",
-    "description_fr": "Inondations au Canada - collections de produits cartographiques" 
+    "description_fr": "Inondations au Canada - collections de produits cartographiques"
   },
   "sibling": [
     {
       "id": "74144824-206e-4cea-9fb9-72925a128189",
       "description_en": "Floods in Canada - Archive",
-      "description_fr": "Inondations au Canada – Archive" 
+      "description_fr": "Inondations au Canada – Archive"
     },
     {
       "id": "b1afd8d2-6e14-4ec4-9a09-652221a6cb71",
       "description_en": "Floods in Canada - Current Year",
-      "description_fr": "Inondations au Canada – Année courante" 
+      "description_fr": "Inondations au Canada – Année courante"
     }
-  ]
+  ],
+  "child": null
 }
 </pre>
 
