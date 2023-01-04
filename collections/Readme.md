@@ -25,7 +25,7 @@ Usage: collections?id=$SOME_UUID
   "self": null,
   "parent": null,
   "sibling": null,
-  "child": null,
+  "child": null
 }
 </pre>
 
