@@ -29,8 +29,8 @@ jobs:
             pip install --target . -r requirements.txt           
             rm -rf botocore*
             rm -rf boto3*
-            find . -name "test" -type d -delete
-            find . -name "__pycache__" -type d -delete
+            find . -name "test" -type d -exec rm -rf {} \;
+            find . -name "__pycache__" -type d -exec rm -rf {} \;
           fi
           cd ../..
                    
