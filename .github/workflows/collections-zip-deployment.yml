@@ -1,4 +1,4 @@
-name: Build deployment AWS Lambdas as ZIP
+name: Build collections API
 on:
   push:
     paths:
