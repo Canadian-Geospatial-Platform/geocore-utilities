@@ -1,3 +1,5 @@
+[![Build collections API](https://github.com/Canadian-Geospatial-Platform/geocore_utilities/actions/workflows/collections-zip-deployment.yml/badge.svg)](https://github.com/Canadian-Geospatial-Platform/geocore_utilities/actions/workflows/collections-zip-deployment.yml)
+
 # Python geoCore Utilities
 
 Useful python aws lambda code snippets to perform operations to support various operations on geocore records and databases
