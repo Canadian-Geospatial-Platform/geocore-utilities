@@ -79,13 +79,15 @@ def find_self(geocore_df, uuid):
     self_desc_en = ""
     self_desc_fr = ""
     self_df = geocore_df[geocore_df['features_properties_id'] == uuid]
+    
+
 
     if len(self_df) == 0:
         self_message = None
     else:
         try:
-            self_desc_en = self_df.iloc[0]['features_properties_title_en']
-            self_desc_fr = self_df.iloc[0]['features_properties_title_fr']
+            self_desc_en = self_df.iloc[0]['features_properties_title_en'].replace('"', '\\"')
+            self_desc_fr = self_df.iloc[0]['features_properties_title_fr'].replace('"', '\\"')
             self_message = '{ "id": "' + uuid + '", "description_en": "' + self_desc_en + '", "description_fr": "' + self_desc_fr + '"}'
         except:
             self_message = None
@@ -110,8 +112,8 @@ def find_parent(geocore_df, uuid):
     else:
         try:
             parent_id = parent_df.iloc[0]['features_properties_parentIdentifier']
-            parent_desc_en = geocore_df[geocore_df['features_properties_id'] == parent_id].iloc[0]['features_properties_title_en']
-            parent_desc_fr = geocore_df[geocore_df['features_properties_id'] == parent_id].iloc[0]['features_properties_title_fr']
+            parent_desc_en = geocore_df[geocore_df['features_properties_id'] == parent_id].iloc[0]['features_properties_title_en'].replace('"', '\\"')
+            parent_desc_fr = geocore_df[geocore_df['features_properties_id'] == parent_id].iloc[0]['features_properties_title_fr'].replace('"', '\\"')
             parent_message = '{ "id": "' + parent_id + '", "description_en": "' + parent_desc_en + '", "description_fr": "' + parent_desc_fr + '"}'
         except:
             parent_message = None
@@ -145,7 +147,7 @@ def find_siblings(geocore_df, parent_id, uuid):
             child_array_desc_fr.append(other_children_df.iloc[i]['features_properties_title_fr'])
 
         for i in range(0,len(other_children_df)):
-            child_message += '{ "id": "' + child_array_id[i] + '", "description_en": "' + child_array_desc_en[i] + '", "description_fr": "' + child_array_desc_fr[i] + '"}'
+            child_message += '{ "id": "' + child_array_id[i] + '", "description_en": "' + child_array_desc_en[i].replace('"', '\\"') + '", "description_fr": "' + child_array_desc_fr[i].replace('"', '\\"') + '"}'
             if i != len(other_children_df)-1:
                 child_message += ', '
         child_message += "]"
@@ -178,7 +180,7 @@ def find_children(geocore_df, uuid):
             child_array_desc_fr.append(other_children_df.iloc[i]['features_properties_title_fr'])
 
         for i in range(0,len(other_children_df)):
-            child_message += '{ "id": "' + child_array_id[i] + '", "description_en": "' + child_array_desc_en[i] + '", "description_fr": "' + child_array_desc_fr[i] + '"}'
+            child_message += '{ "id": "' + child_array_id[i].replace('"', '\\"') + '", "description_en": "' + child_array_desc_en[i].replace('"', '\\"') + '", "description_fr": "' + child_array_desc_fr[i].replace('"', '\\"') + '"}'
             if i != len(other_children_df)-1:
                 child_message += ', '
         child_message += "]"
