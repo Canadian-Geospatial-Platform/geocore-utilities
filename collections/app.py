@@ -8,22 +8,60 @@ import pandas as pd
 import awswrangler as wr
 
 from uuid import UUID
+from datetime import datetime
 from botocore.exceptions import ClientError
 
 PARQUET_BUCKET_NAME = os.environ['PARQUET_BUCKET_NAME']
+EXPIRY_DAYS = 2
+
+cache = {}
+cache_date = {}
 
 def lambda_handler(event, context):
     
     """ 
     Parse query string parameters 
     """
+    message = ""
     
     try:
         uuid = event["id"]
     except:
         uuid = False
     
-    message = ""
+    try:
+        lang = event["lang"]
+    except:
+        lang = "en"
+    
+    if uuid == False:
+        message += "No id parameter was passed. Usage: ?id=XYZ&lang=en_or_fr"
+        return {
+            'statusCode': 200,
+            'body': message
+        }
+    
+    date_time = datetime.utcnow().now()
+    cached_datetime_obj = None
+    
+    compound_key = uuid + "_" + lang
+    cached_datetime_str = get_from_datetime_cache(compound_key)
+    
+    #Check to see if there is a cache hit on the datetime cache
+    if cached_datetime_str != None:
+        format_string = "%Y-%m-%d %H:%M:%S.%f"
+        cached_datetime_obj = datetime.strptime(cached_datetime_str, format_string) #convert datetime str to obj
+        
+        diff = date_time - cached_datetime_obj
+        days = diff.days #calculate the difference in days
+
+        #Compare current curr day with cached date_time
+        if days < EXPIRY_DAYS:
+            #Return the cached result and exit program
+            if get_from_cache(compound_key) != None:
+                return get_from_cache(compound_key)
+        
+    #Cache miss or a need to invalidate the cache
     if uuid != False:
         try:
             print("Finding the parent and other children for uuid: ", uuid)
@@ -44,12 +82,43 @@ def lambda_handler(event, context):
         child_json = None
         child_count = 0
         child_json, child_count = find_children(geocore_df, uuid)
+        if child_json != None:
+            print("child_json ", lang)
+            if lang == 'en':
+                child_json = sorted(child_json, key=lambda x: x['description_en'], reverse=True)
+            elif lang == 'fr':
+                child_json = sorted(child_json, key=lambda x: x['description_fr'], reverse=True)
+            else:
+                child_json = sorted(child_json, key=lambda x: x['description_fr'], reverse=True)
+                
 
         #sibling
         sibling_json = None
         sibling_count = 0
         if parent_json != None and child_json == None:
             sibling_json, sibling_count  = find_siblings(geocore_df, parent_id, uuid)
+            print("sibling_json ", lang)
+            if lang == 'en':
+                sibling_json = sorted(sibling_json, key=lambda x: x['description_en'], reverse=True)
+            elif lang == 'fr':
+                sibling_json = sorted(sibling_json, key=lambda x: x['description_fr'], reverse=True)
+            else:
+                sibling_json = sorted(sibling_json, key=lambda x: x['description_fr'], reverse=True)
+        
+        #Dictionary for the cache
+        json_cache = {
+            'statusCode': 200,
+            'message': nonesafe_loads('{ "message_en": "cached result", "message_fr": "résultat mis en cache" }'),
+            'sibling_count': sibling_count,
+            'child_count': child_count,
+            'self': self_json,
+            'parent': parent_json,
+            'sibling': sibling_json,
+            'child': child_json
+        }
+        
+        add_to_cache(compound_key, json_cache)
+        add_to_datetime_cache(compound_key, str(date_time))
         
     else:
         message += "No id parameter was passed. Usage: ?id=XYZ"
@@ -79,8 +148,6 @@ def find_self(geocore_df, uuid):
     self_desc_en = ""
     self_desc_fr = ""
     self_df = geocore_df[geocore_df['features_properties_id'] == uuid]
-    
-
 
     if len(self_df) == 0:
         self_message = None
@@ -190,3 +257,19 @@ def find_children(geocore_df, uuid):
 def nonesafe_loads(obj):
     if obj is not None:
         return json.loads(obj)
+
+# Function to add JSON payload to the cache
+def add_to_cache(key, json_payload):
+    cache[key] = json_payload
+
+# Function to retrieve JSON payload from the cache
+def get_from_cache(key):
+    return cache.get(key)
+    
+# Function to add datetime payload to the cache_date for invalidation
+def add_to_datetime_cache(key, datetime):
+    cache_date[key] = datetime
+    
+# Function to retrieve datetime payload from the cache_date for invalidation
+def get_from_datetime_cache(key):
+    return cache_date.get(key)
