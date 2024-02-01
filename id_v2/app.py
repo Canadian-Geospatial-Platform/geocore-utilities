@@ -143,12 +143,12 @@ def lambda_handler(event, context):
             #geocore_extensions
             try:
                 plugins                = self_df.iloc[0]['features_properties_plugins']
-            except:
+            except ClientError as e:
                 plugins                = None
             
             try:
                 sourcesystemname       = self_df.iloc[0]['features_properties_sourceSystemName']
-            except:
+            except ClientError as e:
                 sourcesystemname       = None
 
             #bilingual elements
@@ -163,10 +163,23 @@ def lambda_handler(event, context):
             #similairty 
             try :
                 similarity            = self_df.iloc[0]['features_similarity']
-            except:
+            except ClientError as e:
                 similarity            = None 
             print(similarity)
             #print(type(similarity))
+            
+            #EO collections  
+            try:
+                eoCollection       = self_df.iloc[0]['features_properties_eoCollection']
+            except ClientError as e:
+                eoCollection       = None
+            
+            #EO collections  
+            try:
+                eoFilters       = self_df.iloc[0]['features_properties_eoFilters']
+            except ClientError as e:
+                eoFilters       = None
+                
             
             #json elements
             contact = nonesafe_loads(contact)
@@ -182,6 +195,8 @@ def lambda_handler(event, context):
             #json elements
             similarity = nonesafe_loads(similarity)
             
+            #json elements 
+            eoFilters = nonesafe_loads(eoFilters)
             #body response
             response = {"Items": [{"id": uuid,
                                    "coordinates": coordinates,
@@ -218,7 +233,10 @@ def lambda_handler(event, context):
                                     "distributor": distributor,
                                     "credits": credits,
                                     "options": options,
-                                    "similarity": similarity
+                                    "similarity": similarity,
+                                    "sourceSystemName": sourcesystemname,
+                                    'eoCollection':eoCollection,
+                                    'eoFilters': eoFilters
             }]};
             
         except ClientError as e:
