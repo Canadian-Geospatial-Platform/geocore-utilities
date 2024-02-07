@@ -1,6 +1,6 @@
-import os 
+import os
 import json
-import boto3 
+import boto3
 import logging
 import requests
 import pandas as pd
@@ -16,9 +16,8 @@ cache = {}
 cache_date = {}
 
 def lambda_handler(event, context):
-    
-    """ 
-    Parse query string parameters 
+    """
+    Parse query string parameters
     """
     
     try:
@@ -28,7 +27,7 @@ def lambda_handler(event, context):
     
     try:
         lang = event['lang']
-        if not(lang == "fr" or lang == "en"):
+        if not (lang == "fr" or lang == "en"):
             lang = False
     except:
         lang = False
@@ -49,28 +48,29 @@ def lambda_handler(event, context):
     compound_key = uuid + "_" + lang
     cached_datetime_str = get_from_datetime_cache(compound_key)
     
-    #Check to see if there is a cache hit on the datetime cache
+    # Check to see if there is a cache hit on the datetime cache
     if cached_datetime_str != None:
         format_string = "%Y-%m-%d %H:%M:%S.%f"
         cached_datetime_obj = datetime.strptime(cached_datetime_str, format_string) #convert datetime str to obj
         
         diff = date_time - cached_datetime_obj
-        days = diff.days #calculate the difference in days
+        days = diff.days # calculate the difference in days
 
-        #Compare current curr day with cached date_time
+        # Compare current curr day with cached date_time
         if days < EXPIRY_DAYS:
-            #Return the cached result and exit program
+            # Return the cached result and exit program
             if get_from_cache(compound_key) != None:
                 return get_from_cache(compound_key)
         
-    #Cache miss or a need to invalidate the cache
+    # Cache miss or a need to invalidate the cache
     if uuid != False and lang != False:
         
-        #Read the parquet file
-        geocore_df = wr.s3.read_parquet(path=PARQUET_BUCKET_NAME, pyarrow_additional_kwargs={"types_mapper": None})
+        # Read the parquet file
+        geocore_df = wr.s3.read_parquet(
+            path=PARQUET_BUCKET_NAME, pyarrow_additional_kwargs={"types_mapper": None})
 
         try:
-            #Determine if uuid exists
+            # Determine if uuid exists
             self_df = geocore_df[geocore_df['features_properties_id'] == uuid]
         except ClientError as e:
             message_en += "uuid not found"
@@ -159,84 +159,85 @@ def lambda_handler(event, context):
             elif lang == "fr":
                 description           = self_df.iloc[0]['features_properties_description_fr']
                 keywords              = self_df.iloc[0]['features_properties_keywords_fr']
-                useLimits             = self_df.iloc[0]['features_properties_useLimits_fr']                
-            #similairty 
+                useLimits             = self_df.iloc[0]['features_properties_useLimits_fr']
+            
+            #similarity 
             try :
                 similarity            = self_df.iloc[0]['features_similarity']
             except ClientError as e:
                 similarity            = None 
-            print(similarity)
+            #print(similarity)
             #print(type(similarity))
             
-            #EO collections  
+            #EO collections
             try:
                 eoCollection       = self_df.iloc[0]['features_properties_eoCollection']
             except ClientError as e:
                 eoCollection       = None
             
-            #EO collections  
+            #EO collections
             try:
                 eoFilters       = self_df.iloc[0]['features_properties_eoFilters']
             except ClientError as e:
                 eoFilters       = None
-                
+            #print(eoFilters)
             
-            #json elements
+            # json elements
             contact = nonesafe_loads(contact)
             distributor = nonesafe_loads(distributor)
             credits = nonesafe_loads(credits)
             options = nonesafe_loads(options)
             
-            #json elements
+            # json elements
             locale = nonesafe_loads(locale)
             temporalExtent = nonesafe_loads(temporalExtent)
             graphicOverview = nonesafe_loads(graphicOverview)
             
-            #json elements
+            # json elements
             similarity = nonesafe_loads(similarity)
             
-            #json elements 
+            # json elements 
             eoFilters = nonesafe_loads(eoFilters)
-            #body response
+            # body response
             response = {"Items": [{"id": uuid,
                                    "coordinates": coordinates,
                                    "title_en": title_en,
                                    "title_fr": title_fr,
                                    "description": description,
                                    "published": published,
-                                    "keywords": keywords,
-                                    "topicCategory": topicCategory,
-                                    "created": created,
-                                    "spatialRepresentation": spatialRepresentation,
-                                    "type": type,
-                                    "temporalExtent": temporalExtent,
-                                    "refSys": refSys,
-                                    "refSys_version": refSys_version,
-                                    "status": status,
-                                    "maintenance": maintenance,
-                                    "metadataStandard": metadataStandard,
-                                    "metadataStandardVersion": metadataStandardVersion,
-                                    "distributionFormat_name": distributionFormat_name,
-                                    "distributionFormat_format": distributionFormat_format,
-                                    "useLimits": useLimits,
-                                    "accessConstraints": accessConstraints,
-                                    "otherConstraints": otherConstraints,
-                                    "dateStamp": dateStamp,
-                                    "dataSetURI": dataSetURI,
-                                    "locale": locale,
-                                    "language": language,
-                                    "characterSet": characterSet,
-                                    "environmentDescription": environmentDescription,
-                                    "supplementalInformation": supplementalInformation,
-                                    "graphicOverview": graphicOverview,
-                                    "contact": contact,
-                                    "distributor": distributor,
-                                    "credits": credits,
-                                    "options": options,
-                                    "similarity": similarity,
-                                    "sourceSystemName": sourcesystemname,
-                                    'eoCollection':eoCollection,
-                                    'eoFilters': eoFilters
+                                   "keywords": keywords,
+                                   "topicCategory": topicCategory,
+                                   "created": created,
+                                   "spatialRepresentation": spatialRepresentation,
+                                   "type": type,
+                                   "temporalExtent": temporalExtent,
+                                   "refSys": refSys,
+                                   "refSys_version": refSys_version,
+                                   "status": status,
+                                   "maintenance": maintenance,
+                                   "metadataStandard": metadataStandard,
+                                   "metadataStandardVersion": metadataStandardVersion,
+                                   "distributionFormat_name": distributionFormat_name,
+                                   "distributionFormat_format": distributionFormat_format,
+                                   "useLimits": useLimits,
+                                   "accessConstraints": accessConstraints,
+                                   "otherConstraints": otherConstraints,
+                                   "dateStamp": dateStamp,
+                                   "dataSetURI": dataSetURI,
+                                   "locale": locale,
+                                   "language": language,
+                                   "characterSet": characterSet,
+                                   "environmentDescription": environmentDescription,
+                                   "supplementalInformation": supplementalInformation,
+                                   "graphicOverview": graphicOverview,
+                                   "contact": contact,
+                                   "distributor": distributor,
+                                   "credits": credits,
+                                   "options": options,
+                                   "similarity": similarity,
+                                   "sourceSystemName": sourcesystemname,
+                                   "eoCollection": eoCollection,
+                                   "eoFilters": eoFilters
             }]};
             
         except ClientError as e:
