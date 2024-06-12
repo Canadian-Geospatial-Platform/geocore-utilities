@@ -14,6 +14,7 @@ EXPIRY_DAYS = int(os.environ['CACHE_EXPIRY_IN_DAYS'])
 
 cache = {}
 cache_date = {}
+cache_df = pd.DataFrame()
 
 def lambda_handler(event, context):
     """
@@ -54,7 +55,7 @@ def lambda_handler(event, context):
         cached_datetime_obj = datetime.strptime(cached_datetime_str, format_string) #convert datetime str to obj
         
         diff = date_time - cached_datetime_obj
-        days = diff.days # calculate the difference in days
+        days = diff.days #calculate the difference in days
 
         # Compare current curr day with cached date_time
         if days < EXPIRY_DAYS:
@@ -65,20 +66,28 @@ def lambda_handler(event, context):
     # Cache miss or a need to invalidate the cache
     if uuid != False and lang != False:
         
-        # Read the parquet file
-        geocore_df = wr.s3.read_parquet(
-            path=PARQUET_BUCKET_NAME, pyarrow_additional_kwargs={"types_mapper": None})
+        #Read the parquet file, and cache dataframe if cold start
+        geocore_df = get_df_cache()
+        if geocore_df.empty:
+            geocore_df = wr.s3.read_parquet(path=PARQUET_BUCKET_NAME, pyarrow_additional_kwargs={"types_mapper": None})
+            #print("From S3")
+            add_df_to_cache(geocore_df)
+        else:
+            print("From DF Cache")
 
         try:
-            # Determine if uuid exists
-            self_df = geocore_df[geocore_df['features_properties_id'] == uuid]
+            #Determine if uuid exists - create index on cold start so 'id' is cached subsequently
+            geocore_df['features_properties_id'] = geocore_df['features_properties_id'].astype(str)
+            geocore_df = geocore_df.set_index('features_properties_id')
+            self_df = geocore_df.loc[[uuid]]
+            
         except ClientError as e:
             message_en += "uuid not found"
             message_fr += "uuid introuvable"
         
         try:
             try:
-                id                    = self_df.iloc[0]['features_properties_id']
+                id                    = uuid
             except:
                 return {
                     'statusCode': 200,
@@ -94,7 +103,7 @@ def lambda_handler(event, context):
             topicCategory             = self_df.iloc[0]['features_properties_topicCategory']
             created                   = self_df.iloc[0]['features_properties_date_created_date']
             spatialRepresentation     = self_df.iloc[0]['features_properties_spatialRepresentation']
-            type                      = self_df.iloc[0]['features_properties_type']
+            hnap_type                 = self_df.iloc[0]['features_properties_type']
             
             try:
                 begin_temp = self_df.iloc[0]['features_properties_temporalExtent_begin']
@@ -182,62 +191,62 @@ def lambda_handler(event, context):
                 eoFilters       = None
             #print(eoFilters)
             
-            # json elements
+            #json elements
             contact = nonesafe_loads(contact)
             distributor = nonesafe_loads(distributor)
             credits = nonesafe_loads(credits)
             options = nonesafe_loads(options)
             
-            # json elements
+            #json elements
             locale = nonesafe_loads(locale)
             temporalExtent = nonesafe_loads(temporalExtent)
             graphicOverview = nonesafe_loads(graphicOverview)
             
-            # json elements
+            #json elements
             similarity = nonesafe_loads(similarity)
             
-            # json elements 
+            #json elements 
             eoFilters = nonesafe_loads(eoFilters)
-            # body response
-            response = {"Items": [{"id": uuid,
-                                   "coordinates": coordinates,
-                                   "title_en": title_en,
-                                   "title_fr": title_fr,
-                                   "description": description,
-                                   "published": published,
-                                   "keywords": keywords,
-                                   "topicCategory": topicCategory,
-                                   "created": created,
-                                   "spatialRepresentation": spatialRepresentation,
-                                   "type": type,
-                                   "temporalExtent": temporalExtent,
-                                   "refSys": refSys,
-                                   "refSys_version": refSys_version,
-                                   "status": status,
-                                   "maintenance": maintenance,
-                                   "metadataStandard": metadataStandard,
-                                   "metadataStandardVersion": metadataStandardVersion,
-                                   "distributionFormat_name": distributionFormat_name,
-                                   "distributionFormat_format": distributionFormat_format,
-                                   "useLimits": useLimits,
-                                   "accessConstraints": accessConstraints,
-                                   "otherConstraints": otherConstraints,
-                                   "dateStamp": dateStamp,
-                                   "dataSetURI": dataSetURI,
-                                   "locale": locale,
-                                   "language": language,
-                                   "characterSet": characterSet,
-                                   "environmentDescription": environmentDescription,
-                                   "supplementalInformation": supplementalInformation,
-                                   "graphicOverview": graphicOverview,
-                                   "contact": contact,
-                                   "distributor": distributor,
-                                   "credits": credits,
-                                   "options": options,
-                                   "similarity": similarity,
-                                   "sourceSystemName": sourcesystemname,
-                                   "eoCollection": eoCollection,
-                                   "eoFilters": eoFilters
+            #body response
+            response = {"Items": [{ "id": uuid,
+                                    "coordinates": coordinates,
+                                    "title_en": title_en,
+                                    "title_fr": title_fr,
+                                    "description": description,
+                                    "published": published,
+                                    "keywords": keywords,
+                                    "topicCategory": topicCategory,
+                                    "created": created,
+                                    "spatialRepresentation": spatialRepresentation,
+                                    "type": hnap_type,
+                                    "temporalExtent": temporalExtent,
+                                    "refSys": refSys,
+                                    "refSys_version": refSys_version,
+                                    "status": status,
+                                    "maintenance": maintenance,
+                                    "metadataStandard": metadataStandard,
+                                    "metadataStandardVersion": metadataStandardVersion,
+                                    "distributionFormat_name": distributionFormat_name,
+                                    "distributionFormat_format": distributionFormat_format,
+                                    "useLimits": useLimits,
+                                    "accessConstraints": accessConstraints,
+                                    "otherConstraints": otherConstraints,
+                                    "dateStamp": dateStamp,
+                                    "dataSetURI": dataSetURI,
+                                    "locale": locale,
+                                    "language": language,
+                                    "characterSet": characterSet,
+                                    "environmentDescription": environmentDescription,
+                                    "supplementalInformation": supplementalInformation,
+                                    "graphicOverview": graphicOverview,
+                                    "contact": contact,
+                                    "distributor": distributor,
+                                    "credits": credits,
+                                    "options": options,
+                                    "similarity": similarity,
+                                    "sourceSystemName": sourcesystemname,
+                                    "eoCollection": eoCollection,
+                                    "eoFilters": eoFilters
             }]};
             
         except ClientError as e:
@@ -287,3 +296,13 @@ def add_to_datetime_cache(key, datetime):
 # Function to retrieve datetime payload from the cache_date for invalidation
 def get_from_datetime_cache(key):
     return cache_date.get(key)
+
+# Add dataframe to cache
+def add_df_to_cache(dataframe):
+    global cache_df
+    cache_df = dataframe.copy()
+
+# Get dataframe to cache
+def get_df_cache():
+    global cache_df
+    return cache_df
