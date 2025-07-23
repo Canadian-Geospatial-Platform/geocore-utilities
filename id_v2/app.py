@@ -6,33 +6,33 @@ import requests
 import pandas as pd
 import awswrangler as wr
 
+from dashboard import *
 from datetime import datetime
 from botocore.exceptions import ClientError
 
 PARQUET_BUCKET_NAME = os.environ['PARQUET_BUCKET_NAME']
 EXPIRY_DAYS = int(os.environ['CACHE_EXPIRY_IN_DAYS'])
+AOS_HOST = os.environ['OS_ENDPOINT']
+NEW_INDEX_NAME = os.environ['NEW_INDEX_NAME']
+REGION = 'ca-central-1'
 
 cache = {}
 cache_date = {}
 cache_df = pd.DataFrame()
+
+search_index_name = NEW_INDEX_NAME
 
 def lambda_handler(event, context):
     """
     Parse query string parameters
     """
     
-    try:
-        uuid = event['id']
-    except:
-        uuid = False
-    
-    try:
-        lang = event['lang']
-        if not (lang == "fr" or lang == "en"):
-            lang = False
-    except:
+    uuid = event.get('id', False)
+
+    lang = event.get('lang', False)
+    if lang not in ("fr", "en"):
         lang = False
-    
+       
     message_en = ""
     message_fr = ""
     response = uuid
@@ -60,8 +60,28 @@ def lambda_handler(event, context):
         # Compare current curr day with cached date_time
         if days < EXPIRY_DAYS:
             # Return the cached result and exit program
-            if get_from_cache(compound_key) != None:
-                return get_from_cache(compound_key)
+            cached_result = get_from_cache(compound_key)
+            if cached_result != None:
+                ###
+                ### Dashboard code for cache hit
+                ###
+                event['cached'] = True
+                first_item = cached_result['body']['Items'][0]
+                event['title_en'] = first_item['title_en']
+                event['title_fr'] = first_item['title_fr']
+                event['organization'] = extract_org_second_segment(first_item['contact'])
+                try:
+                    os_client = connect_to_opensearch(REGION, AOS_HOST)
+                except:
+                    os_client = None
+                    print("OpenSearch client is not available. Skipping write.")
+
+                if os_client:
+                    write_to_opensearch (os_client, event, search_index_name)
+                else:
+                    print("OpenSearch is not available. Skipping write.")
+
+                return cached_result
         
     # Cache miss or a need to invalidate the cache
     if uuid != False and lang != False:
@@ -76,6 +96,7 @@ def lambda_handler(event, context):
             print("From DF Cache")
 
         try:
+            #print(len(geocore_df))
             #Determine if uuid exists - create index on cold start so 'id' is cached subsequently
             geocore_df['features_properties_id'] = geocore_df['features_properties_id'].astype(str)
             geocore_df = geocore_df.set_index('features_properties_id')
@@ -147,17 +168,18 @@ def lambda_handler(event, context):
             distributionFormat_format = self_df.iloc[0]['features_properties_distributionFormat_format']
             supplementalInformation   = self_df.iloc[0]['features_properties_supplementalInformation_en']
             credits                   = self_df.iloc[0]['features_properties_credits']
+            cited                     = self_df.iloc[0]['features_properties_cited']
             distributor               = self_df.iloc[0]['features_properties_distributor']
             
             #geocore_extensions
             try:
                 plugins                = self_df.iloc[0]['features_properties_plugins']
-            except ClientError as e:
+            except:
                 plugins                = None
             
             try:
                 sourcesystemname       = self_df.iloc[0]['features_properties_sourceSystemName']
-            except ClientError as e:
+            except:
                 sourcesystemname       = None
 
             #bilingual elements
@@ -173,21 +195,19 @@ def lambda_handler(event, context):
             #similarity 
             try :
                 similarity            = self_df.iloc[0]['features_similarity']
-            except ClientError as e:
+            except:
                 similarity            = None 
-            #print(similarity)
-            #print(type(similarity))
-            
+
             #EO collections
             try:
                 eoCollection       = self_df.iloc[0]['features_properties_eoCollection']
-            except ClientError as e:
+            except:
                 eoCollection       = None
             
             #EO collections
             try:
                 eoFilters       = self_df.iloc[0]['features_properties_eoFilters']
-            except ClientError as e:
+            except:
                 eoFilters       = None
             #print(eoFilters)
             
@@ -195,6 +215,7 @@ def lambda_handler(event, context):
             contact = nonesafe_loads(contact)
             distributor = nonesafe_loads(distributor)
             credits = nonesafe_loads(credits)
+            cited = nonesafe_loads(cited)
             options = nonesafe_loads(options)
             
             #json elements
@@ -242,6 +263,8 @@ def lambda_handler(event, context):
                                     "contact": contact,
                                     "distributor": distributor,
                                     "credits": credits,
+                                    "cited": cited,
+                                    "plugins": plugins,
                                     "options": options,
                                     "similarity": similarity,
                                     "sourceSystemName": sourcesystemname,
@@ -259,6 +282,25 @@ def lambda_handler(event, context):
     
     message = '{ "message_en": "' + message_en + '", "message_fr": "' + message_fr + '" }'
     json_message = nonesafe_loads(message)
+
+    ###
+    ### Dashboard code for cache miss
+    ###
+    event['cached'] = False
+    event['title_en'] = title_en
+    event['title_fr'] = title_fr
+    event['organization'] = extract_org_second_segment(contact)
+
+    try:
+        os_client = connect_to_opensearch(REGION, AOS_HOST)
+    except:
+        os_client = None
+        print("OpenSearch client is not available. Skipping write.")
+
+    if os_client:
+        write_to_opensearch (os_client, event, search_index_name)
+    else:
+        print("OpenSearch is not available. Skipping write.")
     
     #Dictionary for the cache
     json_cache = {
@@ -306,3 +348,37 @@ def add_df_to_cache(dataframe):
 def get_df_cache():
     global cache_df
     return cache_df
+
+def extract_org_second_segment(contact_list):
+    """
+    Extracts the second segment (split by ;) of the 'organisation' field 
+    from the first contact in a list.
+    
+    Returns a dict with 'en' and 'fr' keys. If missing or error, returns None values.
+    """
+    try:
+        # Step 1: If input is a JSON string, parse it
+        if isinstance(contact_list, str):
+            import json
+            contact_list = json.loads(contact_list)
+
+        # Step 2: Ensure it's a list with at least one item
+        if not isinstance(contact_list, list) or not contact_list:
+            return {"en": None, "fr": None}
+
+        contact = contact_list[0]
+        org = contact.get("organisation", {})
+
+        # Step 3: Extract second segment from a semicolon-separated string
+        def get_second_segment(s):
+            if isinstance(s, str):
+                parts = [p.strip() for p in s.split(";")]
+                if len(parts) >= 2:
+                    return parts[1]
+            return None
+
+        return get_second_segment(org.get("en"))
+
+    except Exception as e:
+        print("Error in extract_org_second_segment:", e)
+        return {"en": None, "fr": None}
