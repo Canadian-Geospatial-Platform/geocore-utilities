@@ -41,6 +41,7 @@ def write_to_opensearch(os_client, event, search_index_name):
     http_method = event.get('http_method', '') or ''
     id = event.get('id', '') or ''
     lang = event.get('lang', '') or ''
+    referrer = event.get('referrer', '') or ''
     org = event.get('organization', '') or ''
     cached = event.get('cached', '') or ''
     title_en = event.get('title_en', '') or ''
@@ -54,6 +55,7 @@ def write_to_opensearch(os_client, event, search_index_name):
             "timestamp": timestamp,
             "lang": lang,
             "id": id,
+            "referrer": referrer,
             "organization": org,
             "cached": cached,
             "title_en": title_en,

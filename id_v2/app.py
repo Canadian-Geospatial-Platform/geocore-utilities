@@ -6,6 +6,7 @@ import requests
 import pandas as pd
 import awswrangler as wr
 
+from stats import *
 from dashboard import *
 from datetime import datetime
 from botocore.exceptions import ClientError
@@ -28,6 +29,8 @@ def lambda_handler(event, context):
     """
     
     uuid = event.get('id', False)
+
+    referrer = event.get('referrer', False)
 
     lang = event.get('lang', False)
     if lang not in ("fr", "en"):
@@ -65,6 +68,7 @@ def lambda_handler(event, context):
                 ###
                 ### Dashboard code for cache hit
                 ###
+                event['referrer'] = referrer
                 event['cached'] = True
                 first_item = cached_result['body']['Items'][0]
                 event['title_en'] = first_item['title_en']
@@ -96,15 +100,20 @@ def lambda_handler(event, context):
             print("From DF Cache")
 
         try:
-            #print(len(geocore_df))
+            print(len(geocore_df))
             #Determine if uuid exists - create index on cold start so 'id' is cached subsequently
             geocore_df['features_properties_id'] = geocore_df['features_properties_id'].astype(str)
             geocore_df = geocore_df.set_index('features_properties_id')
             self_df = geocore_df.loc[[uuid]]
             
-        except ClientError as e:
+        except:
             message_en += "uuid not found"
             message_fr += "uuid introuvable"
+            return {
+                'statusCode': 200,
+                'message': nonesafe_loads('{ "message_en": "' + message_en + '", "message_fr": "' + message_fr + '" }'),
+                'body': None
+            }
         
         try:
             try:
@@ -286,6 +295,7 @@ def lambda_handler(event, context):
     ###
     ### Dashboard code for cache miss
     ###
+    event['referrer'] = referrer
     event['cached'] = False
     event['title_en'] = title_en
     event['title_fr'] = title_fr
@@ -301,12 +311,23 @@ def lambda_handler(event, context):
         write_to_opensearch (os_client, event, search_index_name)
     else:
         print("OpenSearch is not available. Skipping write.")
+
+    ###
+    ### Add statistics to response
+    ###
+
+    hits = get_stats(os_client, search_index_name, uuid)
+    #print(hits)
+
+    response_clean = clean_na(response)
+    json_message_clean = clean_na(json_message)
     
     #Dictionary for the cache
     json_cache = {
         'statusCode': 200,
+        'hits': hits,
         'message': nonesafe_loads('{ "message_en": "cached result", "message_fr": "résultat mis en cache" }'),
-        'body': response
+        'body': response_clean
     }
     
     add_to_cache(compound_key, json_cache)
@@ -314,15 +335,34 @@ def lambda_handler(event, context):
     
     return {
         'statusCode': 200,
-        'message': json_message,
-        'body': response
+        'hits': hits,
+        'message': json_message_clean,
+        'body': response_clean
     }
 
 # Wrapper to safely load json objects in case it is null
 def nonesafe_loads(obj):
-    if obj is not None:
-        return json.loads(obj)
-        
+    """Load JSON if string, or return None for pd.NA, np.nan."""
+    if isinstance(obj, str):
+        try:
+            return json.loads(obj)
+        except json.JSONDecodeError:
+            return obj
+    if isinstance(obj, (pd._libs.missing.NAType, float)) and pd.isna(obj):
+        return None
+    return obj
+
+# Recursively replace pd.NA, np.nan with None for JSON serialization.
+def clean_na(obj):
+    if isinstance(obj, dict):
+        return {k: clean_na(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_na(x) for x in obj]
+    elif isinstance(obj, (pd._libs.missing.NAType, float)) and pd.isna(obj):
+        return None
+    else:
+        return obj
+
 # Function to add JSON payload to the cache
 def add_to_cache(key, json_payload):
     cache[key] = json_payload
