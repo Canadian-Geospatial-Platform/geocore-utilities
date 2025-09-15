@@ -137,22 +137,30 @@ def lambda_handler(event, context):
             
             try:
                 begin_temp = self_df.iloc[0]['features_properties_temporalExtent_begin']
-                if begin_temp == None:
-                    begin_temp = 'None'
-            except:
-                begin_temp = 'None'
-            
+                if pd.isna(begin_temp):
+                    begin_temp = "None"
+            except Exception:
+                begin_temp = "None"
+
             try:
                 end_temp = self_df.iloc[0]['features_properties_temporalExtent_end']
-                if end_temp == None:
-                    end_temp = 'Present'
-            except:
-                end_temp = 'None'
-                
+                if pd.isna(end_temp):
+                    end_temp = "Present"
+            except Exception:
+                end_temp = "None"
+
             try:
-                temporalExtent        = '{"begin": "' + begin_temp + '", "end": "' + end_temp + '" }'
-            except:
-                temporalExtent        = '{"begin": "0001-01-01", "end": "0001-01-01"}'
+                temporalExtent = {
+                    "begin": begin_temp,
+                    "end": end_temp
+                }
+            except Exception:
+                temporalExtent = {
+                    "begin": "0001-01-01",
+                    "end": "0001-01-01"
+                }
+            
+            #print("temporalExtent", temporalExtent)
                 
             refSys                    = self_df.iloc[0]['features_properties_refSys']
             refSys_version            = self_df.iloc[0]['features_properties_refSys_version']
@@ -342,22 +350,29 @@ def lambda_handler(event, context):
 
 # Wrapper to safely load json objects in case it is null
 def nonesafe_loads(obj):
-    """Load JSON if string, or return None for pd.NA, np.nan."""
+    """Load JSON if string, or return None for pd.NA, np.nan, or invalid JSON."""
     if isinstance(obj, str):
         try:
-            return json.loads(obj)
+            val = json.loads(obj)
+            return val
         except json.JSONDecodeError:
-            return obj
-    if isinstance(obj, (pd._libs.missing.NAType, float)) and pd.isna(obj):
-        return None
+            # instead of returning the raw string, treat bad JSON as None
+            return None
+    #if isinstance(obj, (pd._libs.missing.NAType, float)) and pd.isna(obj):
+    #    return None
     return obj
 
 # Recursively replace pd.NA, np.nan with None for JSON serialization.
 def clean_na(obj):
+    """Recursively replace pd.NA, np.nan, and 'null'/'NaN' strings with None."""
     if isinstance(obj, dict):
         return {k: clean_na(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [clean_na(x) for x in obj]
+    elif isinstance(obj, str):
+        if obj.strip().lower() in {"null", "nan", "none"}:
+            return None
+        return obj
     elif isinstance(obj, (pd._libs.missing.NAType, float)) and pd.isna(obj):
         return None
     else:
