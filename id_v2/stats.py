@@ -20,6 +20,7 @@ def get_stats(os_client, index, target_id):
     # Query for last 30 days
     body_last_30_days = {
         "size": 0,
+        "track_total_hits": True,
         "query": {
             "bool": {
                 "filter": [
@@ -41,6 +42,7 @@ def get_stats(os_client, index, target_id):
     # Query for all time
     body_all_time = {
         "size": 0,
+        "track_total_hits": True,
         "query": {
             "bool": {
                 "filter": [
